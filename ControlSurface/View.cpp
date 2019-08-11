@@ -20,7 +20,6 @@ View::~View()
 
 void View::paint_impl(QPainter* painter) const
 {
-  painter->drawText(boundingRect(), "Change me");
 }
 }
 

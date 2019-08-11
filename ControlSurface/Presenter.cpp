@@ -28,14 +28,13 @@ Presenter::Presenter(
     MacroCommandDispatcher<AddControlMacro> disp{this->context().context.commandStack};
     for(auto& message : lst) {
       disp.submit(new AddControl{m_model, std::move(message)});
-      qDebug() << "added " << message;
     }
     disp.commit();
   });
 
 
   auto item = new Media::Effect::DefaultEffectItem{m_model, this->context().context, m_view};
-  item->setPos(50, 50);
+  item->setPos(0, 0);
 }
 
 void Presenter::setWidth(qreal val, qreal defaultWidth)
