@@ -20,7 +20,7 @@ Model::~Model()
 
 QString Model::prettyName() const noexcept
 {
-  return tr("ControlSurface Process");
+  return tr("Control surface");
 }
 
 void Model::startExecution()
