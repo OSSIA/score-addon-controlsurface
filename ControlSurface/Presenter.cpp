@@ -25,9 +25,10 @@ Presenter::Presenter(
     if(lst.isEmpty())
       return;
 
-    MacroCommandDispatcher<AddControlMacro> disp{this->context().context.commandStack};
+    auto& docctx = this->context().context;
+    MacroCommandDispatcher<AddControlMacro> disp{docctx.commandStack};
     for(auto& message : lst) {
-      disp.submit(new AddControl{m_model, std::move(message)});
+      disp.submit(new AddControl{docctx, m_model, std::move(message)});
     }
     disp.commit();
   });

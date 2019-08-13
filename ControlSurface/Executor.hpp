@@ -5,38 +5,48 @@
 #include <ossia/dataflow/safe_nodes/executor.hpp>
 #include <Process/Dataflow/Port.hpp>
 
+#include <Process/ExecutionSetup.hpp>
 
 namespace ossia
 {
 class control_surface_node : public ossia::graph_node
 {
 public:
-  std::vector<ossia::value*> controls;
-  ossia::value& add_control()
+  std::vector<std::pair<ossia::value*, bool>> controls;
+  std::pair<ossia::value*, bool>& add_control()
   {
-    auto port = new ossia::outlet(ossia::value_port{});
-    controls.push_back(new ossia::value);
-    m_outlets.push_back(port);
-    return *controls.back();
+    auto inletport = new ossia::inlet(ossia::value_port{});
+    auto outletport = new ossia::outlet(ossia::value_port{});
+    controls.push_back({new ossia::value, false});
+    m_inlets.push_back(inletport);
+    m_outlets.push_back(outletport);
+    return controls.back();
   }
 
   struct control_updater
   {
-    ossia::value& control;
+    std::pair<ossia::value*, bool>& control;
     ossia::value v;
 
     void operator()() noexcept
     {
-      control = std::move(v);
+      *control.first = std::move(v);
+      control.second = true;
     }
   };
 
   void run(token_request, exec_state_facade) noexcept override
   {
-    int n = controls.size();
+    // TODO take input port data into account.
+    const int n = controls.size();
     for(int i = 0; i < n; i++)
     {
-      m_outlets[i]->data.target<ossia::value_port>()->write_value(std::move(*controls[i]), 0);
+      auto& ctl = controls[i];
+      if(ctl.second)
+      {
+        m_outlets[i]->data.target<ossia::value_port>()->write_value(std::move(*ctl.first), 0);
+        ctl.second = false;
+      }
     }
   }
 
@@ -61,7 +71,7 @@ class Model;
     {
       if (auto node = weak_node.lock())
       {
-        ctx.executionQueue.enqueue(ossia::control_surface_node::control_updater{*node->controls[i], val});
+        ctx.executionQueue.enqueue(ossia::control_surface_node::control_updater{node->controls[i], val});
       }
     }
   };
@@ -85,25 +95,29 @@ public:
                 "ControlSurface",
                 parent}
   {
-    auto node = std::make_shared<ossia::control_surface_node>();
+    std::shared_ptr<ossia::control_surface_node> node = std::make_shared<ossia::control_surface_node>();
     this->node = node;
     this->m_ossia_process = std::make_shared<ossia::node_process>(this->node);
-
 
     // Initialize all the controls in the node with the current value.
     // And update the node when the UI changes
 
+    const auto& map = element.outputAddresses();
     int i = 0;
-    for(auto& ctl : element.outlets())
+    for(auto& ctl : element.inlets())
     {
-      ossia::value& p = node->add_control();
-      auto ctrl = safe_cast<Process::ControlOutlet*>(ctl);
-      p = ctrl->value(); // TODO does this make sense ?
+      std::pair<ossia::value*, bool>& p = node->add_control();
+      auto ctrl = safe_cast<Process::ControlInlet*>(ctl);
+      *p.first = ctrl->value(); // TODO does this make sense ?
+      p.second = true; // we will send the first value
+
+      const State::AddressAccessor& addr = map.at(ctl->id());
+      system().setup.set_destination(addr, node->outputs().back());
 
       std::weak_ptr weak_node = node;
       QObject::connect(
             ctrl,
-            &Process::ControlOutlet::valueChanged,
+            &Process::ControlInlet::valueChanged,
             this,
             con_unvalidated{ctx, i, weak_node});
       i++;

@@ -2,6 +2,13 @@
 
 #include <wobjectimpl.h>
 
+#include <Process/Dataflow/Port.hpp>
+#include <Process/Dataflow/WidgetInlets.hpp>
+
+#include <Explorer/Explorer/DeviceExplorerModel.hpp>
+
+#include <Curve/CurveModel.hpp>
+
 W_OBJECT_IMPL(ControlSurface::Model)
 namespace ControlSurface
 {
@@ -16,6 +23,145 @@ Model::Model(
 
 Model::~Model()
 {
+}
+
+template<typename T>
+struct SliderWithOutputAddress final : public T
+{
+  static auto static_concreteKey() noexcept
+  {
+    return Metadata<ConcreteKey_k, SliderWithOutputAddress<T>>::get();
+  }
+  auto concreteKey() const noexcept override
+  {
+    return static_concreteKey();
+  }
+  void serialize_impl(const VisitorVariant& vis) const noexcept override
+  {
+    score::serialize_dyn(vis, *this);
+  }
+
+  W_OBJECT(SliderWithOutputAddress<T>)
+  using base_type = Process::ControlInlet;
+  using control_type = WidgetFactory::IntSlider;
+  template<typename... Args>
+  SliderWithOutputAddress(Args&&... args)
+    : T{std::forward<Args>(args)...}
+  {
+  }
+
+  void setOutputAddress(const State::AddressAccessor& addr)
+  {
+    if(addr != m_outputAddr)
+    {
+      m_outputAddr = addr;
+      outputAddressChanged(m_outputAddr);
+    }
+  }
+
+  const State::AddressAccessor& outputAddress() const noexcept
+  {
+    return m_outputAddr;
+  }
+
+  void outputAddressChanged(const State::AddressAccessor& addr)
+  W_SIGNAL(outputAddressChanged, addr)
+
+private:
+  State::AddressAccessor m_outputAddr;
+};
+
+W_OBJECT_IMPL(SliderWithOutputAddress<T>, template<typename T>)
+//UUID_METADATA(, WidgetInletFactory<SliderWithOutputAddress<IntSlider>>, SliderWithOutputAddress<Process::IntSlider>, "a8e60bde-5e81-4b37-ba58-a9047da6a850");
+Process::ControlInlet* makeControlFromType(
+      const Id<Process::Port>& id,
+      const Device::FullAddressAccessorSettings& addr,
+      QObject* parent)
+{
+ //SliderWithOutputAddress<Process::IntSlider>();
+  // TODO make better widgets if we have more information.
+  switch(addr.value.get_type())
+  {
+    case ossia::val_type::INT:
+      return new Process::IntSlider{id, parent};
+    case ossia::val_type::FLOAT:
+      return new Process::FloatSlider{id, parent};
+    case ossia::val_type::BOOL:
+      return new Process::Toggle{id, parent};
+    case ossia::val_type::STRING:
+      return new Process::LineEdit{id, parent};
+    default:
+      return new Process::ControlInlet(id, parent);
+  }
+}
+
+void Model::addControl(
+      const Id<Process::Port>& id,
+      const Device::FullAddressAccessorSettings & msg)
+{
+  auto ctl = makeControlFromType(id, msg, this);
+  m_outputAddresses[id] = msg.address;
+  //ctl->setAddress(msg.address);
+  ctl->setValue(msg.value);
+  ctl->setDomain(msg.domain);
+  if(auto desc = ossia::net::get_description(msg.extendedAttributes))
+  {
+    ctl->setDescription(QString::fromStdString(*desc));
+  }
+
+  auto setName = [ctl] (const State::AddressAccessor& addr) {
+    int length_limit = 20;
+    if(addr.address.path.isEmpty())
+    {
+      ctl->setCustomData("-");
+    }
+    else
+    {
+      auto quals = State::toString(addr.qualifiers);
+      length_limit -= quals.length();
+
+      QString str;
+
+      auto it = addr.address.path.rbegin();
+      while(it != addr.address.path.rend()) {
+        QString new_str = str;
+
+        new_str.prepend("/" + *it);
+
+        ++it;
+        if(new_str.length() <= length_limit)
+        {
+          str = new_str;
+        }
+        else
+        {
+          break;
+        }
+      }
+
+      // Remove the first / if it's not a whole address
+      if(it != addr.address.path.rend())
+        str.remove(0, 1);
+
+      ctl->setCustomData(str + quals);
+    }
+  };
+
+
+  inlets().push_back(std::move(ctl));
+  controlAdded(id);
+
+  setName(msg.address);
+//  QObject::connect(ctl, &Process::ControlInlet::addressChanged,
+//                   ctl, setName);
+}
+
+void Model::removeControl(const Id<Process::Port>& m_id)
+{
+  auto it = ossia::find_if(inlets(), [&] (const auto& inlet) { return inlet->id() == m_id; });
+  SCORE_ASSERT(it != inlets().end());
+  controlRemoved(**it);
+  inlets().erase(it);
 }
 
 QString Model::prettyName() const noexcept
