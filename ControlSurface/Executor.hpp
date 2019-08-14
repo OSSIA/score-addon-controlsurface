@@ -114,7 +114,7 @@ public:
       const State::AddressAccessor& addr = map.at(ctl->id());
       system().setup.set_destination(addr, node->outputs().back());
 
-      std::weak_ptr weak_node = node;
+      std::weak_ptr<ossia::control_surface_node> weak_node = node;
       QObject::connect(
             ctrl,
             &Process::ControlInlet::valueChanged,
