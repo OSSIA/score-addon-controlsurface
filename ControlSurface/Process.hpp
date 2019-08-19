@@ -10,6 +10,10 @@ namespace Device
 {
 struct FullAddressAccessorSettings;
 }
+namespace Process
+{
+class ControlInlet;
+}
 
 namespace ControlSurface
 {
@@ -40,6 +44,8 @@ public:
   Process::Outlets& outlets() noexcept { return m_outlets; }
 
   void addControl(const Id<Process::Port>& id, const Device::FullAddressAccessorSettings& message);
+
+  void setupControl(Process::ControlInlet* ctl, const State::AddressAccessor& addr);
   void removeControl(const Id<Process::Port>& id);
 
   const address_map& outputAddresses() const noexcept
@@ -54,7 +60,7 @@ private:
   void setDurationAndGrow(const TimeVal& newDuration) noexcept override;
   void setDurationAndShrink(const TimeVal& newDuration) noexcept override;
 
-  ossia::fast_hash_map<Id<Process::Port>, State::AddressAccessor>m_outputAddresses;
+  ossia::fast_hash_map<Id<Process::Port>, State::AddressAccessor> m_outputAddresses;
 };
 
 using ProcessFactory = Process::ProcessFactory_T<ControlSurface::Model>;

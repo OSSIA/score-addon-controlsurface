@@ -5,6 +5,17 @@
 
 #include <score/model/Identifier.hpp>
 
+namespace Process
+{
+class Port;
+class ControlInlet;
+class PortFactoryList;
+}
+namespace score
+{
+struct DocumentContext;
+}
+
 namespace ControlSurface
 {
 class Model;
@@ -30,7 +41,16 @@ public:
   const Id<Process::ProcessModel>& modelId() const override;
 
 private:
+  void setupInlet(
+      Process::ControlInlet& inlet,
+      const Process::PortFactoryList& portFactory,
+      const score::DocumentContext& doc);
+  void on_controlAdded(const Id<Process::Port>& id);
+  void on_controlRemoved(const Process::Port& p);
+
   const Model& m_model;
   View* m_view{};
+  struct Port;
+  std::vector<Port> m_ports;
 };
 }

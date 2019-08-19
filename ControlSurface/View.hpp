@@ -2,13 +2,24 @@
 #include <Process/LayerView.hpp>
 #include <State/Message.hpp>
 
+namespace Process
+{
+class Port;
+class ControlInlet;
+class PortFactoryList;
+}
+namespace score
+{
+struct DocumentContext;
+}
 namespace ControlSurface
 {
 class View final : public Process::LayerView
 {
   W_OBJECT(View)
 public:
-  explicit View(QGraphicsItem* parent);
+  explicit View(
+             QGraphicsItem* parent);
   ~View() override;
 
   void addressesDropped(State::MessageList lst)

@@ -95,12 +95,20 @@ Process::ControlInlet* makeControlFromType(
   }
 }
 
+void Model::setupControl(
+      Process::ControlInlet* ctl, const State::AddressAccessor& addr)
+{
+  m_outputAddresses[ctl->id()] = addr;
+
+  inlets().push_back(ctl);
+  controlAdded(ctl->id());
+}
+
 void Model::addControl(
       const Id<Process::Port>& id,
       const Device::FullAddressAccessorSettings & msg)
 {
   auto ctl = makeControlFromType(id, msg, this);
-  m_outputAddresses[id] = msg.address;
   //ctl->setAddress(msg.address);
   ctl->setValue(msg.value);
   ctl->setDomain(msg.domain);
@@ -147,21 +155,24 @@ void Model::addControl(
     }
   };
 
-
-  inlets().push_back(std::move(ctl));
-  controlAdded(id);
-
   setName(msg.address);
+
+  setupControl(ctl, msg.address);
+
 //  QObject::connect(ctl, &Process::ControlInlet::addressChanged,
 //                   ctl, setName);
 }
 
 void Model::removeControl(const Id<Process::Port>& m_id)
 {
+  m_outputAddresses.erase(m_id);
+
   auto it = ossia::find_if(inlets(), [&] (const auto& inlet) { return inlet->id() == m_id; });
   SCORE_ASSERT(it != inlets().end());
   controlRemoved(**it);
+  auto ptr = *it;
   inlets().erase(it);
+  delete ptr;
 }
 
 QString Model::prettyName() const noexcept
